@@ -15,6 +15,7 @@ subprojects {
     apply plugin: 'idea'
     apply plugin: 'eclipse'
     apply plugin: 'nebula.compile-api'
+    apply plugin: 'maven-publish'
 
     sourceCompatibility = 1.7
     targetCompatibility = 1.7
@@ -42,6 +43,24 @@ subprojects {
         }
     }
 
+    publishing {
+        publications {
+            mavenJava(MavenPublication) {
+                artifact(file("$rootDir/gradle.properties"))
+            }
+        }
+
+        repositories {
+            maven {
+                // change to point to your repo, e.g. http://my.org/repo
+                url mavenUrl
+                credentials {
+                    username mavenUsername
+                    password mavenPassword
+                }
+            }
+        }
+    }
 }
 project(':dyno-core') {
     apply plugin: 'osgi'
@@ -51,6 +70,7 @@ project(':dyno-core') {
         compileApi "org.apache.commons:commons-math:2.2"
         compileApi "commons-io:commons-io:2.4"
     }
+
 }
 
 project(':dyno-contrib') {
@@ -66,7 +86,7 @@ project(':dyno-contrib') {
         compileApi 'org.apache.commons:commons-lang3:3.5'
         compileApi ('com.ecwid.consul:consul-api:1.2.1') {
             exclude group: 'org.apache.httpcomponents'
-        }       
+        }
         testCompile 'com.pszymczyk.consul:embedded-consul:0.3.3'
     }
 }
