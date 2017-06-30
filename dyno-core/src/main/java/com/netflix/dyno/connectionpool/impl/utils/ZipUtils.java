@@ -28,6 +28,16 @@ public final class ZipUtils {
     private ZipUtils() {
     }
 
+    public static byte[] compressValue(byte[] value) throws IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream(value.length);
+        GZIPOutputStream gos = new GZIPOutputStream(baos);
+        gos.write(Base64.encode(value));
+        gos.close();
+        byte[] compressed = baos.toByteArray();
+        baos.close();
+        return compressed;
+    }
+
     public static byte[] compressString(String value) throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream(value.length());
         GZIPOutputStream gos = new GZIPOutputStream(baos);
@@ -105,16 +115,28 @@ public final class ZipUtils {
     }
 
     /**
+     * Encodes the given string with Base64 encoding and then GZIP compresses it. Returns
+     * result as a Base64 encoded string.
+     *
+     * @param value input String
+     * @return Base64 encoded compressed String
+     * @throws IOException
+     */
+    public static byte[] compressValueToBase64(byte[] value) throws IOException {
+        return Base64.encode(compressValue(value));
+    }
+
+    /**
      * Decompresses the given byte array and decodes with Base64 decoding
      *
      * @param compressed byte array input
      * @return decompressed data in string format
      * @throws IOException
      */
-    public static String decompressString(byte[] compressed) throws IOException {
+    public static byte[] decompress(byte[] compressed) throws IOException {
         ByteArrayInputStream is = new ByteArrayInputStream(compressed);
         InputStream gis = new GZIPInputStream(is);
-        return new String(Base64.decode(IOUtils.toByteArray(gis)), StandardCharsets.UTF_8);
+        return Base64.decode(IOUtils.toByteArray(gis));
     }
 
     /**
@@ -125,7 +147,18 @@ public final class ZipUtils {
      * @throws IOException
      */
     public static String decompressFromBase64String(String compressed) throws IOException {
-        return decompressString(Base64.decode(compressed.getBytes(StandardCharsets.UTF_8)));
+        return new String(decompress(Base64.decode(compressed.getBytes(StandardCharsets.UTF_8))), StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Given a Base64 encoded String, decompresses it.
+     *
+     * @param compressed Compressed String
+     * @return decompressed String
+     * @throws IOException
+     */
+    public static byte[] decompressFromBase64(byte[] compressed) throws IOException {
+        return decompress(Base64.decode(compressed));
     }
 
     /**

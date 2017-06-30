@@ -389,7 +389,9 @@ public class HostSelectionWithFallback<CL> {
 
         if (uniqueCounts.size() > 1) {
             throw new RuntimeException("Invalid configuration - replication factor cannot be asymmetric");
-        }
+        } else if (uniqueCounts.size() == 0) {
+        	return 0;
+		}
 
         int rf = uniqueCounts.toArray(new Integer[uniqueCounts.size()])[0];
 

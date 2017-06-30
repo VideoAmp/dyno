@@ -289,8 +289,11 @@ public class HostConnectionPoolImpl<CL> implements HostConnectionPool<CL> {
 		@Override
 		public Connection<CL> createConnection() {
 			
-			try { 
-				Connection<CL> connection = connFactory.createConnection((HostConnectionPool<CL>) pool, null);
+			try {
+				if (Logger.isDebugEnabled()) {
+					Logger.debug("Creating connection to {}", pool.getHost().toString());
+				}
+				Connection<CL> connection = connFactory.createConnection(pool, null);
 				connection.open();
 				availableConnections.add(connection);
 

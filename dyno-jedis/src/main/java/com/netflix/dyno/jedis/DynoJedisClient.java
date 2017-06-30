@@ -35,9 +35,11 @@ import redis.clients.jedis.*;
 import redis.clients.jedis.params.geo.GeoRadiusParam;
 import redis.clients.jedis.params.sortedset.ZAddParams;
 import redis.clients.jedis.params.sortedset.ZIncrByParams;
+import redis.clients.util.SafeEncoder;
 
 import javax.net.ssl.SSLSocketFactory;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicReference;
@@ -188,6 +190,36 @@ public class DynoJedisClient implements JedisCommands, BinaryJedisCommands, Mult
             super(k, o);
         }
 
+        private CompressionValueOperation(byte[] k, OpName o) {
+            super(k, o);
+        }
+
+        /**
+         * Compresses the value based on the threshold defined by
+         * {@link ConnectionPoolConfiguration#getValueCompressionThreshold()}
+         *
+         * @param value
+         * @return
+         */
+        @Override
+        public byte[] compressValue(byte[] value, ConnectionContext ctx) {
+            byte[] result = value;
+            int thresholdBytes = connPool.getConfiguration().getValueCompressionThreshold();
+
+            try {
+                // prefer speed over accuracy here so rather than using getBytes() to get the actual size
+                // just estimate using 2 bytes per character
+                if ((2 * value.length) > thresholdBytes) {
+                    result = ZipUtils.compressValueToBase64(value);
+                    ctx.setMetadata("compression", true);
+                }
+            } catch (IOException e) {
+                Logger.warn("UNABLE to compress [" + value + "] for key [" + getKey() + "]; sending value uncompressed");
+            }
+
+            return result;
+        }
+
         /**
          * Compresses the value based on the threshold defined by
          * {@link ConnectionPoolConfiguration#getValueCompressionThreshold()}
@@ -212,6 +244,20 @@ public class DynoJedisClient implements JedisCommands, BinaryJedisCommands, Mult
             }
 
             return result;
+        }
+
+        @Override
+        public byte[] decompressValue(byte[] value, ConnectionContext ctx) {
+            try {
+                if (ZipUtils.isCompressed(value)) {
+                    ctx.setMetadata("decompression", true);
+                    return ZipUtils.decompressFromBase64(value);
+                }
+            } catch (IOException e) {
+                Logger.warn("Unable to decompress value [" + value + "]");
+            }
+
+            return value;
         }
 
         @Override
@@ -272,12 +318,52 @@ public class DynoJedisClient implements JedisCommands, BinaryJedisCommands, Mult
             return result;
         }
 
+        /**
+         * Compresses the value based on the threshold defined by
+         * {@link ConnectionPoolConfiguration#getValueCompressionThreshold()}
+         *
+         * @param value
+         * @return
+         */
+        @Override
+        public byte[] compressValue(byte[] value, ConnectionContext ctx) {
+            byte[] result = value;
+            int thresholdBytes = connPool.getConfiguration().getValueCompressionThreshold();
+
+            try {
+                // prefer speed over accuracy here so rather than using getBytes() to get the actual size
+                // just estimate using 2 bytes per character
+                if ((2 * value.length) > thresholdBytes) {
+                    result = ZipUtils.compressValueToBase64(value);
+                    ctx.setMetadata("compression", true);
+                }
+            } catch (IOException e) {
+                Logger.warn("UNABLE to compress [" + value + "] for key [" + getKey() + "]; sending value uncompressed");
+            }
+
+            return result;
+        }
+
         @Override
         public String decompressValue(String value, ConnectionContext ctx) {
             try {
                 if (ZipUtils.isCompressed(value)) {
                     ctx.setMetadata("decompression", true);
                     return ZipUtils.decompressFromBase64String(value);
+                }
+            } catch (IOException e) {
+                Logger.warn("Unable to decompress value [" + value + "]");
+            }
+
+            return value;
+        }
+
+        @Override
+        public byte[] decompressValue(byte[] value, ConnectionContext ctx) {
+            try {
+                if (ZipUtils.isCompressed(value)) {
+                    ctx.setMetadata("decompression", true);
+                    return ZipUtils.decompressFromBase64(value);
                 }
             } catch (IOException e) {
                 Logger.warn("Unable to decompress value [" + value + "]");
@@ -543,25 +629,7 @@ public class DynoJedisClient implements JedisCommands, BinaryJedisCommands, Mult
 
     @Override
     public String hget(final String key, final String field) {
-        return d_hget(key, field).getResult();
-    }
-
-    public OperationResult<String> d_hget(final String key, final String field) {
-        if (CompressionStrategy.NONE == connPool.getConfiguration().getCompressionStrategy()) {
-            return connPool.executeWithFailover(new BaseKeyOperation<String>(key, OpName.HGET) {
-                @Override
-                public String execute(Jedis client, ConnectionContext state) throws DynoException {
-                    return client.hget(key, field);
-                }
-            });
-        } else {
-            return connPool.executeWithFailover(new CompressionValueOperation<String>(key, OpName.HGET) {
-                @Override
-                public String execute(final Jedis client, final ConnectionContext state) throws DynoException {
-                    return decompressValue(client.hget(key, field), state);
-                }
-            });
-        }
+        return new String(d_hget(SafeEncoder.encode(key), SafeEncoder.encode(field)).getResult(), StandardCharsets.UTF_8);
     }
 
     @Override
@@ -812,26 +880,7 @@ public class DynoJedisClient implements JedisCommands, BinaryJedisCommands, Mult
 
     @Override
     public Long hset(final String key, final String field, final String value) {
-        return d_hset(key, field, value).getResult();
-    }
-
-    public OperationResult<Long> d_hset(final String key, final String field, final String value) {
-        if (CompressionStrategy.NONE == connPool.getConfiguration().getCompressionStrategy()) {
-            return connPool.executeWithFailover(new BaseKeyOperation<Long>(key, OpName.HSET) {
-                @Override
-                public Long execute(Jedis client, ConnectionContext state) {
-                    return client.hset(key, field, value);
-                }
-
-            });
-        } else {
-            return connPool.executeWithFailover(new CompressionValueOperation<Long>(key, OpName.HSET) {
-                @Override
-                public Long execute(final Jedis client, final ConnectionContext state) throws DynoException {
-                    return client.hset(key, field, compressValue(value, state));
-                }
-            });
-        }
+        return d_hset(SafeEncoder.encode(key), SafeEncoder.encode(field), SafeEncoder.encode(value)).getResult();
     }
 
     @Override
@@ -2854,13 +2903,50 @@ public class DynoJedisClient implements JedisCommands, BinaryJedisCommands, Mult
     }
 
     @Override
-    public Long hset(byte[] key, byte[] field, byte[] value) {
-        throw new UnsupportedOperationException("not yet implemented");
+    public Long hset(byte[] key, byte[] field, byte[] value)  {
+        return d_hset(key, field, value).getResult();
+    }
+
+    public OperationResult<Long> d_hset(final byte[] key, final byte[] field, final byte[] value) {
+        if (CompressionStrategy.NONE == connPool.getConfiguration().getCompressionStrategy()) {
+            return connPool.executeWithFailover(new BaseKeyOperation<Long>(key, OpName.HSET) {
+                @Override
+                public Long execute(Jedis client, ConnectionContext state) {
+                    return client.hset(key, field, value);
+                }
+
+            });
+        } else {
+            return connPool.executeWithFailover(new CompressionValueOperation<Long>(key, OpName.HSET) {
+                @Override
+                public Long execute(final Jedis client, final ConnectionContext state) throws DynoException {
+                    return client.hset(key, field, compressValue(value, state));
+                }
+            });
+        }
     }
 
     @Override
     public byte[] hget(byte[] key, byte[] field) {
-        throw new UnsupportedOperationException("not yet implemented");
+        return d_hget(key, field).getResult();
+    }
+
+    private OperationResult<byte[]> d_hget(final byte[] key, final byte[] field) {
+        if (CompressionStrategy.NONE == connPool.getConfiguration().getCompressionStrategy()) {
+            return connPool.executeWithFailover(new BaseKeyOperation<byte[]>(key, OpName.HGET) {
+                @Override
+                public byte[] execute(Jedis client, ConnectionContext state) throws DynoException {
+                    return client.hget(key, field);
+                }
+            });
+        } else {
+            return connPool.executeWithFailover(new CompressionValueOperation<byte[]>(key, OpName.HGET) {
+                @Override
+                public byte[] execute(final Jedis client, final ConnectionContext state) throws DynoException {
+                    return decompressValue(client.hget(key, field), state);
+                }
+            });
+        }
     }
 
     @Override
@@ -2915,7 +3001,32 @@ public class DynoJedisClient implements JedisCommands, BinaryJedisCommands, Mult
 
     @Override
     public Map<byte[], byte[]> hgetAll(byte[] key) {
-        throw new UnsupportedOperationException("not yet implemented");
+        return d_hgetAll(key).getResult();
+    }
+
+    public OperationResult<Map<byte[], byte[]>> d_hgetAll(final byte[] key) {
+        if (CompressionStrategy.NONE == connPool.getConfiguration().getCompressionStrategy()) {
+            return connPool.executeWithFailover(new BaseKeyOperation<Map<byte[], byte[]>>(key, OpName.HGETALL) {
+                @Override
+                public Map<byte[], byte[]> execute(Jedis client, ConnectionContext state) throws DynoException {
+                    return client.hgetAll(key);
+                }
+            });
+        } else {
+            return connPool.executeWithFailover(new CompressionValueOperation<Map<byte[], byte[]>>(key, OpName.HGETALL) {
+                @Override
+                public Map<byte[], byte[]> execute(final Jedis client, final ConnectionContext state) {
+                    return CollectionUtils.transform(
+                            client.hgetAll(key),
+                            new CollectionUtils.MapEntryTransform<byte[], byte[], byte[]>() {
+                                @Override
+                                public byte[] get(byte[] key, byte[] val) {
+                                    return decompressValue(val, state);
+                                }
+                            });
+                }
+            });
+        }
     }
 
     @Override
@@ -3286,12 +3397,12 @@ public class DynoJedisClient implements JedisCommands, BinaryJedisCommands, Mult
     }
 
     /**
-     * NOT SUPPORTED ! Use {@link #dyno_scan(CursorBasedResult, String...)}
+     * NOT SUPPORTED ! Use {@link #dyno_scan(CursorBasedResult, int, String...)}
      * instead.
      *
      * @param cursor
      * @return nothing -- throws UnsupportedOperationException when invoked
-     * @see #dyno_scan(CursorBasedResult, String...)
+     * @see #dyno_scan(CursorBasedResult, int, String...)
      */
     @Override
     public ScanResult<String> scan(int cursor) {
@@ -3299,12 +3410,12 @@ public class DynoJedisClient implements JedisCommands, BinaryJedisCommands, Mult
     }
 
     /**
-     * NOT SUPPORTED ! Use {@link #dyno_scan(CursorBasedResult, String...)}
+     * NOT SUPPORTED ! Use {@link #dyno_scan(CursorBasedResult, int, String...)}
      * instead.
      *
      * @param cursor
      * @return nothing -- throws UnsupportedOperationException when invoked
-     * @see #dyno_scan(CursorBasedResult, String...)
+     * @see #dyno_scan(CursorBasedResult, int, String...)
      */
     @Override
     public ScanResult<String> scan(String cursor) {
