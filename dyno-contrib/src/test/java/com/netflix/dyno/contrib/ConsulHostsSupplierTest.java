@@ -42,12 +42,7 @@ public class ConsulHostsSupplierTest {
 
     @Before
     public void beforeEach() {
-        String config = "{" +
-            "\"datacenter\": \"test-dc\"," +
-            "\"log_level\": \"INFO\"," +
-            "\"node_name\": \"foobar\"" +
-            "}";
-        consulServer = ConsulStarterBuilder.consulStarter().withCustomConfig(config).build().start();
+        consulServer = ConsulStarterBuilder.consulStarter().build().start();
         consulClient = new ConsulClient("127.0.0.1", consulServer.getHttpPort());
     }
 

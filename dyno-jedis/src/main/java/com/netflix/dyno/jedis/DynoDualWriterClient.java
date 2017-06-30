@@ -25,6 +25,7 @@ import redis.clients.jedis.Jedis;
 import redis.clients.jedis.ScanParams;
 import redis.clients.jedis.ScanResult;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -226,11 +227,11 @@ public class DynoDualWriterClient extends DynoJedisClient {
 
     @Override
     public Long hset(final String key, final String field, final String value) {
-        return this.d_hset(key, field, value).getResult();
+        return this.d_hset(key.getBytes(StandardCharsets.UTF_8), field.getBytes(StandardCharsets.UTF_8), value.getBytes(StandardCharsets.UTF_8)).getResult();
     }
 
     @Override
-    public OperationResult<Long> d_hset(final String key, final String field, final String value) {
+    public OperationResult<Long> d_hset(final byte[] key, final byte[] field, final byte[] value) {
         writeAsync(key, new Callable<OperationResult<Long>>() {
             @Override
             public OperationResult<Long> call() throws Exception {
