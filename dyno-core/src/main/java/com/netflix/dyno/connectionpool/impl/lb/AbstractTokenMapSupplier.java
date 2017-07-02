@@ -124,7 +124,7 @@ public abstract class AbstractTokenMapSupplier implements TokenMapSupplier {
         unsuppliedPort = port;
     }
     
-    public AbstractTokenMapSupplier(int port,String localZone,String localDatacenter) {
+    public AbstractTokenMapSupplier(int port, String localZone, String localDatacenter) {
         this.localZone = localZone;
         this.localDatacenter = localDatacenter;
         unsuppliedPort = port;

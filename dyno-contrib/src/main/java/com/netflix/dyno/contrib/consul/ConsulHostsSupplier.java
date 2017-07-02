@@ -14,13 +14,6 @@
  * limitations under the License.
  */
 package com.netflix.dyno.contrib.consul;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-
-import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.ecwid.consul.v1.ConsulClient;
 import com.ecwid.consul.v1.QueryParams;
@@ -31,13 +24,19 @@ import com.google.common.base.Function;
 import com.google.common.base.Supplier;
 import com.google.common.collect.Collections2;
 import com.google.common.collect.Lists;
-import com.netflix.discovery.DiscoveryManager;
 import com.netflix.dyno.connectionpool.Host;
 import com.netflix.dyno.connectionpool.HostSupplier;
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Simple class that implements {@link Supplier}<{@link List}<{@link Host}>>. It provides a List<{@link Host}>
- * using the {@link DiscoveryManager} which is the consul client. 
+ * using the {@link ConsulClient} which is the consul client.
  * 
  * Note that the class needs the consul application name to discover all instances for that application.
  * 
@@ -90,9 +89,9 @@ public class ConsulHostsSupplier implements HostSupplier {
         Response<List<HealthService>> services = discoveryClient.getHealthServices(applicationName, false, QueryParams.DEFAULT);
 
         List<HealthService> app = services.getValue();
-        List<Host> hosts = new ArrayList<Host>();
+        List<Host> hosts = new ArrayList<>();
 
-        if (app != null && app.size() < 0) {
+        if (app == null || app.size() < 0) {
             return hosts;
         }
 
@@ -128,9 +127,8 @@ public class ConsulHostsSupplier implements HostSupplier {
                             Logger.error("Rack wasn't found for host:" + info.getNode()
                                     + " there may be issues matching it up to the token map");
                         }
-                        Host host = new Host(hostName, hostName, info.getService().getPort(), rack,
+                        return new Host(hostName, hostName, info.getService().getPort(), rack,
                                 String.valueOf(metaData.get("datacenter")), status);
-                        return host;
                     }
                 }));
 

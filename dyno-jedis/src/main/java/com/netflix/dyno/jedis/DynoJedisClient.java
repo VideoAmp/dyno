@@ -2956,12 +2956,61 @@ public class DynoJedisClient implements JedisCommands, BinaryJedisCommands, Mult
 
     @Override
     public String hmset(byte[] key, Map<byte[], byte[]> hash) {
-        throw new UnsupportedOperationException("not yet implemented");
+        return d_hmset(key, hash).getResult();
+    }
+
+    public OperationResult<String> d_hmset(final byte[] key, final Map<byte[], byte[]> hash) {
+        if (CompressionStrategy.NONE == connPool.getConfiguration().getCompressionStrategy()) {
+            return connPool.executeWithFailover(new BaseKeyOperation<String>(key, OpName.HMSET) {
+                @Override
+                public String execute(Jedis client, ConnectionContext state) {
+                    return client.hmset(key, hash);
+                }
+            });
+        } else {
+            return connPool.executeWithFailover(new CompressionValueOperation<String>(key, OpName.HMSET) {
+                @Override
+                public String execute(final Jedis client, final ConnectionContext state) throws DynoException {
+                    return client.hmset(key,
+                            CollectionUtils.transform(hash, new CollectionUtils.MapEntryTransform<byte[], byte[], byte[]>() {
+                                @Override
+                                public byte[] get(byte[] key, byte[] val) {
+                                    return compressValue(val, state);
+                                }
+                            })
+                    );
+                }
+            });
+        }
     }
 
     @Override
     public List<byte[]> hmget(byte[] key, byte[]... fields) {
-        throw new UnsupportedOperationException("not yet implemented");
+        return d_hmget(key, fields).getResult();
+    }
+
+    public OperationResult<List<byte[]>> d_hmget(final byte[] key, final byte[]... fields) {
+        if (CompressionStrategy.NONE == connPool.getConfiguration().getCompressionStrategy()) {
+            return connPool.executeWithFailover(new BaseKeyOperation<List<byte[]>>(key, OpName.HMGET) {
+                @Override
+                public List<byte[]> execute(Jedis client, ConnectionContext state) {
+                    return client.hmget(key, fields);
+                }
+            });
+        } else {
+            return connPool.executeWithFailover(new CompressionValueOperation<List<byte[]>>(key, OpName.HMGET) {
+                @Override
+                public List<byte[]> execute(final Jedis client, final ConnectionContext state) throws DynoException {
+                    return new ArrayList<>(CollectionUtils.transform(client.hmget(key, fields),
+                            new CollectionUtils.Transform<byte[], byte[]>() {
+                                @Override
+                                public byte[] get(byte[] s) {
+                                    return decompressValue(s, state);
+                                }
+                            }));
+                }
+            });
+        }
     }
 
     @Override
