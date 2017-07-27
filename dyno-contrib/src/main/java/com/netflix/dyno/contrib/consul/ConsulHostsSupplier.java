@@ -26,10 +26,13 @@ import com.google.common.collect.Collections2;
 import com.google.common.collect.Lists;
 import com.netflix.dyno.connectionpool.Host;
 import com.netflix.dyno.connectionpool.HostSupplier;
+import org.apache.commons.lang.UnhandledException;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -62,14 +65,24 @@ public class ConsulHostsSupplier implements HostSupplier {
     // The Dynomite cluster name for discovering nodes
     private final String applicationName;
     private final ConsulClient discoveryClient;
+    private final QueryParams queryParams;
 
     public ConsulHostsSupplier(String applicationName, ConsulClient discoveryClient) {
+        this(applicationName, discoveryClient, QueryParams.DEFAULT);
+    }
+
+    public ConsulHostsSupplier(String applicationName, ConsulClient discoveryClient, QueryParams queryParams) {
         this.applicationName = applicationName;
         this.discoveryClient = discoveryClient;
+        this.queryParams = queryParams;
     }
 
     public static ConsulHostsSupplier newInstance(String applicationName, ConsulHostsSupplier hostsSupplier) {
         return new ConsulHostsSupplier(applicationName, hostsSupplier.getDiscoveryClient());
+    }
+
+    public static ConsulHostsSupplier newInstance(String applicationName, ConsulHostsSupplier hostsSupplier, QueryParams queryParams) {
+        return new ConsulHostsSupplier(applicationName, hostsSupplier.getDiscoveryClient(), queryParams);
     }
 
     @Override
@@ -86,12 +99,12 @@ public class ConsulHostsSupplier implements HostSupplier {
 
         Logger.info("Dyno fetching instance list for app: " + applicationName);
 
-        Response<List<HealthService>> services = discoveryClient.getHealthServices(applicationName, false, QueryParams.DEFAULT);
+        List<Host> hosts = new ArrayList<>();
+        Response<List<HealthService>> services = discoveryClient.getHealthServices(applicationName, false, queryParams);
 
         List<HealthService> app = services.getValue();
-        List<Host> hosts = new ArrayList<>();
 
-        if (app == null || app.size() < 0) {
+        if (app == null || app.size() == 0) {
             return hosts;
         }
 

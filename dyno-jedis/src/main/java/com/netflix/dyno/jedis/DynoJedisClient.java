@@ -2808,7 +2808,19 @@ public class DynoJedisClient implements JedisCommands, BinaryJedisCommands, Mult
 
     @Override
     public Long expire(byte[] key, int seconds) {
-        throw new UnsupportedOperationException("not yet implemented");
+        return d_expire(key, seconds).getResult();
+    }
+
+    public OperationResult<Long> d_expire(final byte[] key, final int seconds) {
+
+        return connPool.executeWithFailover(new BaseKeyOperation<Long>(key, OpName.EXPIRE) {
+
+            @Override
+            public Long execute(Jedis client, ConnectionContext state) {
+                return client.expire(key, seconds);
+            }
+
+        });
     }
 
     @Override
@@ -3412,7 +3424,19 @@ public class DynoJedisClient implements JedisCommands, BinaryJedisCommands, Mult
     
     @Override
     public Long del(byte[] key)  {
-        throw new UnsupportedOperationException("not yet implemented");
+        return d_del(key).getResult();
+    }
+
+    public OperationResult<Long> d_del(final byte[] key) {
+
+        return connPool.executeWithFailover(new BaseKeyOperation<Long>(key, OpName.DEL) {
+
+            @Override
+            public Long execute(Jedis client, ConnectionContext state) {
+                return client.del(key);
+            }
+
+        });
     }
 
     @Override

@@ -50,7 +50,7 @@ public class ConsulHelper {
         LinkedHashMap<String, String> metadata = new LinkedHashMap<>();
         if (tags != null) {
             for (String tag : tags) {
-                String[] parts = StringUtils.split(tag, "=");
+                String[] parts = StringUtils.split(tag, ":");
                 switch (parts.length) {
                 case 0:
                     break;
@@ -62,7 +62,7 @@ public class ConsulHelper {
                     break;
                 default:
                     String[] end = Arrays.copyOfRange(parts, 1, parts.length);
-                    metadata.put(parts[0], StringUtils.join(end, "="));
+                    metadata.put(parts[0], StringUtils.join(end, ":"));
                     break;
                 }
 
