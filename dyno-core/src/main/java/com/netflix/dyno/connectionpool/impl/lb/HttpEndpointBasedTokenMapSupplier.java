@@ -57,7 +57,7 @@ public class HttpEndpointBasedTokenMapSupplier extends AbstractTokenMapSupplier 
     }
     
     public HttpEndpointBasedTokenMapSupplier(String url, int port,String localDatacenter,String localRack) {
-    super(port,localDatacenter,localRack);
+    super(port, localRack, localDatacenter);
     serverUrl = transformUrl(url,port);
     }
 

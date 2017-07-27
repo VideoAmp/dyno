@@ -54,9 +54,9 @@ public class ConsulHostsSupplierTest {
     @Test
     public void testAwsHosts() throws JSONException {
         List<String> tags = new ArrayList<>();
-        tags.add("cloud=aws");
-        tags.add("availability-zone=us-east-1b");
-        tags.add("datacenter=us-east-1");
+        tags.add("cloud:aws");
+        tags.add("availability-zone:us-east-1b");
+        tags.add("datacenter:us-east-1");
 
         NewService service = new NewService();
         service.setName(APPLICATION_NAME);
@@ -94,9 +94,9 @@ public class ConsulHostsSupplierTest {
     @Test
     public void testOtherCloudProviderHosts() throws JSONException {
         List<String> tags = new ArrayList<>();
-        tags.add("cloud=kubernetes");
-        tags.add("rack=rack1");
-        tags.add("datacenter=dc1");
+        tags.add("cloud:kubernetes");
+        tags.add("rack:rack1");
+        tags.add("datacenter:dc1");
 
         NewService service = new NewService();
         service.setName(APPLICATION_NAME);
